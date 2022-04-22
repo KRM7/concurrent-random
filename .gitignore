@@ -1,3 +1,7 @@
+.vscode/
+build/
+*.exe
+
 # Prerequisites
 *.d
 
