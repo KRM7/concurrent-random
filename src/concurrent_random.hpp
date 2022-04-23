@@ -20,10 +20,10 @@ public:
 
     result_type operator()() noexcept
     {
+        state_type old_state = state.load(std::memory_order::relaxed);
+
         for (;;)
         {
-            state_type old_state = state.load(std::memory_order::relaxed);
-
             state_type new_state = old_state;
             new_state ^= new_state >> 12;
             new_state ^= new_state << 25;
@@ -49,19 +49,19 @@ private:
     std::atomic<state_type> state;
 };
 
-class splitmix64_concurrent final
+class splitmix64_atomic final
 {
 public:
     using result_type = uint64_t;
     using state_type = uint64_t;
 
-    explicit constexpr splitmix64_concurrent(state_type seed) noexcept
+    explicit constexpr splitmix64_atomic(state_type seed) noexcept
         : state(seed)
     {}
 
     result_type operator()() noexcept
     {
-        result_type z = state += 0x9e3779b97f4a7c15;
+        result_type z = state.fetch_add(0x9e3779b97f4a7c15, std::memory_order::acquire) + 0x9e3779b97f4a7c15;
         z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
         z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
         
@@ -81,6 +81,44 @@ private:
     std::atomic<state_type> state;
 };
 
+template<typename Lock>
+class splitmix64_lock final
+{
+public:
+    using result_type = uint64_t;
+    using state_type = uint64_t;
+
+    explicit constexpr splitmix64_lock(uint64_t seed) noexcept
+        : state(seed)
+    {}
+
+    constexpr result_type operator()() noexcept
+    {
+        lock.lock();
+        state += 0x9e3779b97f4a7c15;
+        result_type z = state;
+        lock.unlock();
+
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+
+        return z ^ (z >> 31);
+    }
+
+    static constexpr result_type min() noexcept
+    {
+        return std::numeric_limits<result_type>::min();
+    }
+    static constexpr result_type max() noexcept
+    {
+        return std::numeric_limits<result_type>::max();
+    }
+
+private:
+    state_type state;
+    Lock lock;
+};
+
 class xoroshiro64ss_concurrent final
 {
 public:
@@ -93,11 +131,12 @@ public:
 
     result_type operator()() noexcept
     {
+        state_type old_state = state.load(std::memory_order::relaxed);
+        
         for (;;)
         {
-            state_type old_state = state.load(std::memory_order::relaxed);
-            uint32_t s0 = old_state;
-            uint32_t s1 = old_state >> 32;
+            uint32_t s0 = old_state >> 32;
+            uint32_t s1 = old_state;
 
             result_type result = std::rotl(s0 * 0x9E3779BB, 5) * 5;
 

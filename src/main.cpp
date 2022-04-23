@@ -3,90 +3,39 @@
 #include "benchmark/benchmark.h"
 #include <random>
 #include <mutex>
+#include "spinlock.hpp"
 
-thread_local splitmix64 prng0{ std::random_device{}() };
-thread_local xoroshiro128p prng1{ std::random_device{}() };
-thread_local sfc64 prng2{ std::random_device{}() };
+thread_local inline splitmix64 prng0{ std::random_device{}() };
+thread_local inline xoroshiro128p prng1{ std::random_device{}() };
+thread_local inline sfc64 prng2{ std::random_device{}() };
 
-std::mutex lock0;
-std::mutex lock1;
-std::mutex lock2;
-splitmix64 prng3{ std::random_device{}() };
-xoroshiro128p prng4{ std::random_device{}() };
-sfc64 prng5{ std::random_device{}() };
-
-void lockSplitmix64(benchmark::State& state)
+template<typename PRNG, typename Lock>
+void lock(benchmark::State& state)
 {
+    PRNG prng{ std::random_device{}() };
+    Lock lock;
     std::uniform_int_distribution int_dist(0, 100);
     std::uniform_real_distribution float_dist(0.0, 1.0);
 
     for (auto _ : state)
     {
-        std::lock_guard guard(lock0);
-        benchmark::DoNotOptimize(int_dist(prng3));
-        benchmark::DoNotOptimize(float_dist(prng3));
+        std::lock_guard guard(lock);
+        benchmark::DoNotOptimize(int_dist(prng));
+        benchmark::DoNotOptimize(float_dist(prng));
     }
 }
 
-void lockXoroshiro128p(benchmark::State& state)
+template<typename PRNG>
+void threadlocal(benchmark::State& state)
 {
+    thread_local PRNG prng{ std::random_device{}() };
     std::uniform_int_distribution int_dist(0, 100);
     std::uniform_real_distribution float_dist(0.0, 1.0);
 
     for (auto _ : state)
     {
-        std::lock_guard guard(lock1);
-        benchmark::DoNotOptimize(int_dist(prng4));
-        benchmark::DoNotOptimize(float_dist(prng4));
-    }
-}
-
-void lockSfc64(benchmark::State& state)
-{
-    std::uniform_int_distribution int_dist(0, 100);
-    std::uniform_real_distribution float_dist(0.0, 1.0);
-
-    for (auto _ : state)
-    {
-        std::lock_guard guard(lock2);
-        benchmark::DoNotOptimize(int_dist(prng5));
-        benchmark::DoNotOptimize(float_dist(prng5));
-    }
-}
-
-void threadlocalSplitmix64(benchmark::State& state)
-{
-    std::uniform_int_distribution int_dist(0, 100);
-    std::uniform_real_distribution float_dist(0.0, 1.0);
-
-    for (auto _ : state)
-    {
-        benchmark::DoNotOptimize(int_dist(prng0));
-        benchmark::DoNotOptimize(float_dist(prng0));
-    }
-}
-
-void threadlocalXoroshiro128p(benchmark::State& state)
-{
-    std::uniform_int_distribution int_dist(0, 100);
-    std::uniform_real_distribution float_dist(0.0, 1.0);
-
-    for (auto _ : state)
-    {
-        benchmark::DoNotOptimize(int_dist(prng1));
-        benchmark::DoNotOptimize(float_dist(prng1));
-    }
-}
-
-void threadlocalSfc64(benchmark::State& state)
-{
-    std::uniform_int_distribution int_dist(0, 100);
-    std::uniform_real_distribution float_dist(0.0, 1.0);
-
-    for (auto _ : state)
-    {
-        benchmark::DoNotOptimize(int_dist(prng2));
-        benchmark::DoNotOptimize(float_dist(prng2));
+        benchmark::DoNotOptimize(int_dist(prng));
+        benchmark::DoNotOptimize(float_dist(prng));
     }
 }
 
@@ -104,16 +53,22 @@ void lockfree(benchmark::State& state)
     }
 }
 
-#define NTHREADS 1, 16
+#define NTHREADS 1, 8
 
-BENCHMARK(lockSplitmix64)->ThreadRange(NTHREADS);
-BENCHMARK(lockXoroshiro128p)->ThreadRange(NTHREADS);
-BENCHMARK(lockSfc64)->ThreadRange(NTHREADS);
-BENCHMARK(threadlocalSplitmix64)->ThreadRange(NTHREADS);
-BENCHMARK(threadlocalXoroshiro128p)->ThreadRange(NTHREADS);
-BENCHMARK(threadlocalSfc64)->ThreadRange(NTHREADS);
-BENCHMARK_TEMPLATE(lockfree, splitmix64_concurrent)->ThreadRange(NTHREADS);
+BENCHMARK_TEMPLATE(lockfree, splitmix64_lock<std::mutex>)->ThreadRange(NTHREADS);
+BENCHMARK_TEMPLATE(lock, xoroshiro128p, std::mutex)->ThreadRange(NTHREADS);
+BENCHMARK_TEMPLATE(lock, sfc64, std::mutex)->ThreadRange(NTHREADS);
+
+BENCHMARK_TEMPLATE(threadlocal, splitmix64)->ThreadRange(NTHREADS);
+BENCHMARK_TEMPLATE(threadlocal, xoroshiro128p)->ThreadRange(NTHREADS);
+BENCHMARK_TEMPLATE(threadlocal, sfc64)->ThreadRange(NTHREADS);
+
+BENCHMARK_TEMPLATE(lockfree, splitmix64_atomic)->ThreadRange(NTHREADS);
 BENCHMARK_TEMPLATE(lockfree, xoroshiro64ss_concurrent)->ThreadRange(NTHREADS);
 BENCHMARK_TEMPLATE(lockfree, xorshift64s_concurrent)->ThreadRange(NTHREADS);
+
+BENCHMARK_TEMPLATE(lockfree, splitmix64_lock<spinlock>)->ThreadRange(NTHREADS);
+BENCHMARK_TEMPLATE(lock, xoroshiro128p, spinlock)->ThreadRange(NTHREADS);
+BENCHMARK_TEMPLATE(lock, sfc64, spinlock)->ThreadRange(NTHREADS);
 
 BENCHMARK_MAIN();
