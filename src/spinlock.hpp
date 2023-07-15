@@ -1,18 +1,14 @@
-#ifndef SPINLOCK_HPP
-#define SPINLOCK_HPP
+#ifndef BENCHMARK_SPINLOCK_HPP
+#define BENCHMARK_SPINLOCK_HPP
 
 #include <atomic>
 
-#if defined(__clang__)
-    #define SPINLOCK_PAUSE() (__builtin_ia32_pause())
-#elif defined(__GNUC__)
-    #define SPINLOCK_PAUSE() (__builtin_ia32_pause())
-#elif defined(__MSC_VER)
-    #define SPINLOCK_PAUSE() (_mm_pause())
-#elif defined(__INTEL_COMPILER)
-    #define SPINLOCK_PAUSE() (_mm_pause())
+#if defined(__GNUC__) || defined(__clang__)
+    #define SPINLOCK_PAUSE() __builtin_ia32_pause()
+#elif defined(_MSC_VER)
+    #define SPINLOCK_PAUSE() _mm_pause()
 #else
-    #define SPINLOCK_PAUSE() ((void)0)
+    #define SPINLOCK_PAUSE() (void)0
 #endif
 
 class spinlock
@@ -45,7 +41,7 @@ public:
     }
 
 private:
-    std::atomic_flag locked_ = false;
+    std::atomic_flag locked_;
 };
 
-#endif
+#endif // !BENCHMARK_SPINLOCK_HPP

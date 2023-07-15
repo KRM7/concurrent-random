@@ -1,20 +1,20 @@
-#ifndef RANDOM_HPP
-#define RANDOM_HPP
+#ifndef BENCHMARK_RANDOM_HPP
+#define BENCHMARK_RANDOM_HPP
 
-#include <cstdint>
 #include <array>
 #include <limits>
 #include <bit>
 #include <cstddef>
+#include <cstdint>
 
-class splitmix64 final
+class splitmix64
 {
 public:
     using result_type = uint64_t;
-    using state_type = uint64_t;
+    using state_type  = uint64_t;
 
-    explicit constexpr splitmix64(uint64_t seed) noexcept
-        : state(seed)
+    explicit constexpr splitmix64(uint64_t seed) noexcept :
+        state(seed)
     {}
 
     constexpr result_type operator()() noexcept
@@ -40,11 +40,11 @@ private:
     state_type state;
 };
 
-class xoroshiro128p final
+class xoroshiro128p
 {
 public:
     using result_type = uint64_t;
-    using state_type = uint64_t;
+    using state_type  = std::array<uint64_t, 2>;
 
     explicit constexpr xoroshiro128p(uint64_t seed) noexcept
     {
@@ -52,19 +52,13 @@ public:
         state = { seed_seq_gen(), seed_seq_gen() };
     }
 
-    explicit constexpr xoroshiro128p(const std::array<state_type, 2>& state) noexcept
-        : state(state)
-    {}
-
     constexpr result_type operator()() noexcept
     {
-        const state_type s0 = state[0];
-        state_type s1 = state[1];
-        const result_type result = s0 + s1;
+        const auto result = state[0] + state[1];
+        const auto xstate = state[0] ^ state[1];
 
-        s1 ^= s0;
-        state[0] = std::rotl<state_type>(s0, 24U) ^ s1 ^ (s1 << 16);
-        state[1] = std::rotl<state_type>(s1, 37U);
+        state[0] = std::rotl(state[0], 24) ^ xstate ^ (xstate << 16);
+        state[1] = std::rotl(xstate, 37);
 
         return result;
     }
@@ -79,35 +73,19 @@ public:
     }
 
 private:
-    std::array<state_type, 2> state;
+    state_type state;
 };
 
-class sfc64 final
+class dummy_generator
 {
 public:
     using result_type = uint64_t;
-    using state_type = uint64_t;
 
-    explicit constexpr sfc64(uint64_t seed) noexcept
-        : state({ seed, seed, seed, 1 })
-    {
-        warmup();
-    }
-
-    explicit constexpr sfc64(std::array<state_type, 4>& state) noexcept
-        : state(state)
-    {}
+    explicit constexpr dummy_generator(uint64_t) noexcept {}
 
     constexpr result_type operator()() noexcept
     {
-        result_type ret = state[0] + state[1] + state[3];
-        state[3]++;
-
-        state[0] = state[1] ^ (state[1] >> 11);
-        state[1] = state[2] + (state[2] << 3);
-        state[2] = std::rotl<state_type>(state[2], 24) + ret;
-
-        return ret;
+        return 1;
     }
 
     static constexpr result_type min() noexcept
@@ -118,17 +96,6 @@ public:
     {
         return std::numeric_limits<result_type>::max();
     }
-
-private:
-    std::array<state_type, 4> state;
-
-    constexpr void warmup() noexcept
-    {
-        for (size_t i = 0; i < 12; i++) 
-        {
-            operator()();
-        }
-    }
 };
 
-#endif
+#endif // !BENCHMARK_RANDOM_HPP
