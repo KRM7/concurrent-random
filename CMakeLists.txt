@@ -1,14 +1,32 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 
-project(random LANGUAGES CXX)
+project(random VERSION 0.1 LANGUAGES CXX)
 
-add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build")
 
-set(WFLAGS -Wall -Wextra -pedantic)
-set(OFLAGS -O2 -flto)
+if(NOT CMAKE_BUILD_TYPE MATCHES "^(Debug|Release|RelWithDebInfo)$")
+    message(WARNING "The specified build type [${CMAKE_BUILD_TYPE}] is not recognized. Defaulting to Release.")
+    set(CMAKE_BUILD_TYPE "Release")
+endif()
 
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
-target_compile_options(${PROJECT_NAME} PRIVATE -DNDEBUG ${WFLAGS} ${OFLAGS})
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -permissive- -W4 -WX -diagnostics:caret")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Werror -pedantic-errors -g")
+endif()
+
+if(CMAKE_BUILD_TYPE MATCHES "(Release|RelWithDebInfo)")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
+
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp")
+
+add_executable(random ${SOURCES} ${HEADERS})
 
 find_package(benchmark REQUIRED)
-target_link_libraries(${PROJECT_NAME} benchmark::benchmark)
+target_link_libraries(${PROJECT_NAME} benchmark::benchmark_main)
+
+target_compile_features(random PUBLIC "cxx_std_20")
+target_compile_options(random PUBLIC "$<$<CXX_COMPILER_ID:MSVC>:-Zc:preprocessor>" "$<$<CXX_COMPILER_ID:MSVC>:-Zc:__cplusplus>")
