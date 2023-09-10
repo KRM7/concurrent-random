@@ -3,14 +3,6 @@
 
 #include <atomic>
 
-#if defined(__GNUC__) || defined(__clang__)
-    #define SPINLOCK_PAUSE() __builtin_ia32_pause()
-#elif defined(_MSC_VER)
-    #define SPINLOCK_PAUSE() _mm_pause()
-#else
-    #define SPINLOCK_PAUSE() (void)0
-#endif
-
 class spinlock
 {
 public:
@@ -18,26 +10,20 @@ public:
     {
         while (true)
         {
-            if (!locked_.test_and_set(std::memory_order::acquire))
-            {
-                break;
-            }
-            while (locked_.test(std::memory_order::relaxed))
-            {
-                SPINLOCK_PAUSE();
-            }
+            if (!locked_.test_and_set(std::memory_order_acquire)) break;
+            while (locked_.test(std::memory_order_relaxed));
         }
     }
 
     bool try_lock() noexcept
     {
-        return !locked_.test(std::memory_order::relaxed) && 
-               !locked_.test_and_set(std::memory_order::acquire);
+        return !locked_.test(std::memory_order_relaxed) && 
+               !locked_.test_and_set(std::memory_order_acquire);
     }
 
     void unlock() noexcept
     {
-        locked_.clear(std::memory_order::release);
+        locked_.clear(std::memory_order_release);
     }
 
 private:

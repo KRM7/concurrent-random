@@ -1,6 +1,7 @@
 #include "random.hpp"
 #include "concurrent_random.hpp"
 #include "spinlock.hpp"
+#include "shared_spinlock.hpp"
 #include <benchmark/benchmark.h>
 #include <random>
 #include <mutex>
@@ -68,6 +69,10 @@ BENCHMARK_TEMPLATE(lock, xoroshiro128p, std::mutex)->ThreadRange(NTHREADS);
 BENCHMARK_TEMPLATE(lock, dummy_generator, spinlock)->ThreadRange(NTHREADS);
 BENCHMARK_TEMPLATE(lock, splitmix64, spinlock)->ThreadRange(NTHREADS);
 BENCHMARK_TEMPLATE(lock, xoroshiro128p, spinlock)->ThreadRange(NTHREADS);
+
+BENCHMARK_TEMPLATE(lock, dummy_generator, shared_spinlock)->ThreadRange(NTHREADS);
+BENCHMARK_TEMPLATE(lock, splitmix64, shared_spinlock)->ThreadRange(NTHREADS);
+BENCHMARK_TEMPLATE(lock, xoroshiro128p, shared_spinlock)->ThreadRange(NTHREADS);
 
 BENCHMARK_TEMPLATE(lockfree, dummy_generator)->ThreadRange(NTHREADS);
 BENCHMARK_TEMPLATE(lockfree, splitmix64_atomic)->ThreadRange(NTHREADS);
