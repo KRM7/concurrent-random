@@ -17,7 +17,9 @@ public:
 
     bool try_lock() noexcept
     {
-        return lock_.try_lock() && !read_cnt_.load(std::memory_order_acquire);
+        if (!lock_.try_lock()) return false;
+        if (!read_cnt_.load(std::memory_order_acquire)) return true;
+        return lock_.unlock(), false;
     }
 
     void unlock() noexcept
@@ -34,13 +36,10 @@ public:
 
     bool try_lock_shared() noexcept
     {
-        if (lock_.try_lock())
-        {
-            read_cnt_.fetch_add(1, std::memory_order_relaxed);
-            lock_.unlock();
-            return true;
-        }
-        return false;
+        if (!lock_.try_lock()) return false;
+        read_cnt_.fetch_add(1, std::memory_order_relaxed);
+        lock_.unlock();
+        return true;
     }
 
     void unlock_shared() noexcept
